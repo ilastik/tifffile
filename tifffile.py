@@ -151,9 +151,15 @@ from xml.etree import cElementTree as etree
 
 import numpy
 
-import _tifffile
+try:
+    import _tifffile
+except ImportError:
+    warnings.warn(
+        "failed to import the optional _tifffile C extension module.\n"
+        "Loading of some compressed images will be slow.\n"
+        "Tifffile.c can be obtained at http://www.lfd.uci.edu/~gohlke/")
 
-__version__ = '0.4'
+__version__ = '2014.08.24'
 __docformat__ = 'restructuredtext en'
 __all__ = ('imsave', 'imread', 'imshow', 'TiffFile', 'TiffWriter',
            'TiffSequence')
@@ -181,7 +187,7 @@ def imsave(filename, data, **kwargs):
     Examples
     --------
     >>> data = numpy.random.rand(2, 5, 3, 301, 219)
-    >>> description = '{"shape": %s}' % str(list(data.shape))
+    >>> description = u'{"shape": %s}' % str(list(data.shape))
     >>> imsave('temp.tif', data, compress=6,
     ...        extratags=[(270, 's', 0, description, True)])
 
@@ -663,12 +669,12 @@ def imread(files, **kwargs):
 
     Examples
     --------
-    >>> im = imread('temp.tif', key=0)
+    >>> im = imread('test.tif', key=0)
     >>> im.shape
-    (3, 301, 219)
-    >>> ims = imread(['temp.tif', 'temp.tif'])
+    (256, 256, 4)
+    >>> ims = imread(['test.tif', 'test.tif'])
     >>> ims.shape
-    (2, 10, 3, 301, 219)
+    (2, 256, 256, 4)
 
     """
     kwargs_file = {}
@@ -733,10 +739,10 @@ class TiffFile(object):
 
     Examples
     --------
-    >>> with TiffFile('temp.tif') as tif:
+    >>> with TiffFile('test.tif') as tif:
     ...     data = tif.asarray()
     ...     data.shape
-    (5, 301, 219)
+    (256, 256, 4)
 
     """
     def __init__(self, arg, name=None, offset=None, size=None,
@@ -2215,11 +2221,11 @@ class TiffSequence(object):
 
     Examples
     --------
-    >>> tifs = TiffSequence("test.oif.files/*.tif")  # doctest: +SKIP
-    >>> tifs.shape, tifs.axes  # doctest: +SKIP
+    >>> tifs = TiffSequence("test.oif.files/*.tif")
+    >>> tifs.shape, tifs.axes
     ((2, 100), 'CT')
-    >>> data = tifs.asarray()  # doctest: +SKIP
-    >>> data.shape  # doctest: +SKIP
+    >>> data = tifs.asarray()
+    >>> data.shape
     (2, 100, 256, 256)
 
     """
@@ -3081,40 +3087,20 @@ def imagej_description(description):
 
 
 def _replace_by(module_function, package=None, warn=False):
-    """Try replace decorated function by module.function.
+    """Try replace decorated function by module.function."""
+    try:
+        from importlib import import_module
+    except ImportError:
+        warnings.warn('could not import module importlib')
+        return lambda func: func
 
-    This is used to replace local functions with functions from another
-    (usually compiled) module, if available.
-
-    Parameters
-    ----------
-    module_function : str
-        Module and function path string (e.g. numpy.ones)
-    package : str, optional
-        The parent package of the module
-    warn : bool, optional
-        Whether to warn when wrapping fails
-
-    Returns
-    -------
-    func : function
-        Wrapped function, hopefully calling a function in another module.
-
-    Example
-    -------
-    >>> @_replace_by('_tifffile.decodepackbits')
-    ... def decodepackbits(encoded):
-    ...     raise NotImplementedError
-
-    """
     def decorate(func, module_function=module_function, warn=warn):
         try:
-            modname, function = module_function.split('.')
-            if package is None:
-                full_name = modname
+            module, function = module_function.split('.')
+            if not package:
+                module = import_module(module)
             else:
-                full_name = package + '.' + modname
-            module = __import__(full_name, romlist=[modname])
+                module = import_module('.' + module, package=package)
             func, oldfunc = getattr(module, function), func
             globals()['__old_' + func.__name__] = oldfunc
         except Exception:
@@ -3468,7 +3454,7 @@ def stripnull(string):
 
     Clean NULL terminated C strings.
 
-    >>> stripnull(b'string\\x00')  # doctest: +SKIP
+    >>> stripnull(b'string\\x00')
     b'string'
 
     """
@@ -3481,9 +3467,9 @@ def stripascii(string):
 
     Clean NULL separated and terminated TIFF strings.
 
-    >>> stripascii(b'string\\x00string\\n\\x01\\x00')  # doctest: +SKIP
+    >>> stripascii(b'string\\x00string\\n\\x01\\x00')
     b'string\\x00string\\n'
-    >>> stripascii(b'\\x00')  # doctest: +SKIP
+    >>> stripascii(b'\\x00')
     b''
 
     """
