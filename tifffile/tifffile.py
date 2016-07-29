@@ -1668,10 +1668,10 @@ class TiffFile(object):
                                 newaxis = along.attrib.get('Type', 'other')
                                 newaxis = AXES_LABELS[newaxis]
                                 if 'Start' in along.attrib:
-                                    labels = range(
-                                        int(along.attrib['Start']),
-                                        int(along.attrib['End']) + 1,
-                                        int(along.attrib.get('Step', 1)))
+                                    step = float(along.attrib.get('Step', 1))
+                                    start = float(along.attrib['Start'])
+                                    stop = float(along.attrib['End']) + step
+                                    labels = numpy.arange(start, stop, step)
                                 else:
                                     labels = [label.text for label in along
                                               if label.tag.endswith('Label')]
